@@ -1,0 +1,8 @@
+name: Ci DEEP SCAN
+on:
+  pull_request:
+    branches:
+      - "*"
+jobs:
+  common:
+    uses: testVinaycicd/learn-1-terraform/.github/workflows/deep-scan.yml@main
