@@ -22,6 +22,6 @@ COPY --from=build /src/shipping.jar /app/shipping.jar
 
 
 
-EXPOSE 8083
+EXPOSE 8080
 ENTRYPOINT ["java"]
 CMD ["-jar","/app/shipping.jar"]
