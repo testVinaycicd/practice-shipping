@@ -26,7 +26,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=build /src/shipping.jar /app/shipping.jar
 
-# (Optional) If you want the SQL files inside the image (not required if using ConfigMaps):
+# (Optional) If you want the SQL files inside the image (not required if using ConfigMaps) :
 # COPY db/ /app/db/
 
 ENV JAVA_OPTS="-Xms256m -Xmx512m"
