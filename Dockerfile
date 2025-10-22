@@ -1,39 +1,42 @@
-# ---- Build stage ----
+# ---- Build stage (Maven + JDK) ----
 FROM maven:3.9-eclipse-temurin-11 AS build
 WORKDIR /src
 
-# If you have a pom.xml + sources locally, copy and build:
-# (If you don't have the source locally and only rely on the ZIP artifact,
-#  see the alternate path below.)
-COPY . .
-# Download deps first (better layer cache), then compile
+# 1) Prime the cache with deps first
+COPY pom.xml .
 RUN mvn -q -e -DskipTests dependency:go-offline
+
+# 2) Then copy sources and build
+COPY . .
 RUN mvn -q -e -DskipTests clean package \
-  && mv target/shipping-*.jar shipping.jar
+ && find target -name "shipping-*.jar" -maxdepth 1 -print -quit | xargs -I{} cp {} /src/app.jar
 
-# ---- Alternate path: build from the ZIP artifact (uncomment this block and comment out COPY . above) ----
-# RUN apt-get update && apt-get install -y unzip curl && rm -rf /var/lib/apt/lists/*
-# RUN mkdir -p /src/app && \
-#     curl -L -o /tmp/shipping.zip https://roboshop-artifacts.s3.amazonaws.com/shipping-v3.zip && \
-#     unzip -q /tmp/shipping.zip -d /src/app && \
-#     cd /src/app && mvn -q -e -DskipTests clean package && \
-#     mv target/shipping-*.jar /src/shipping.jar
+# ---- Create minimal JRE with jlink ----
+# ---- Create minimal JRE with jlink ----
+FROM eclipse-temurin:11-jdk AS jre
+WORKDIR /opt
+COPY --from=build /src/app.jar /opt/app.jar
 
-# ---- Runtime stage ----
-FROM eclipse-temurin:11-jre-alpine
-# Create nonroot user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Add critical modules explicitly so reflection/JNDI don't break
+# Start with jdeps result, then add must-haves: java.naming (JNDI), java.sql (JDBC), java.xml (XML), jdk.crypto.ec (TLS), jdk.unsupported (Unsafe)
+RUN DEPS="$(jdeps --ignore-missing-deps --print-module-deps /opt/app.jar),java.naming,java.sql,java.xml,jdk.crypto.ec,jdk.unsupported" \
+ && jlink \
+    --add-modules "${DEPS}" \
+    --strip-debug --no-man-pages --no-header-files --compress=2 \
+    --output /opt/jre
+
+
+# ---- Runtime: distroless (no shell, minimal attack surface) ----
+FROM gcr.io/distroless/base-debian12
+USER 65532:65532
 WORKDIR /app
-COPY --from=build /src/shipping.jar /app/shipping.jar
+COPY --from=jre /opt/jre /opt/jre
+COPY --from=build /src/app.jar /app/app.jar
 
-# (Optional) If you want the SQL files inside the image (not required if using ConfigMaps) :
-# COPY db/ /app/db/
+ENV JAVA_OPTS="-XX:+UseContainerSupport -Xms256m -Xmx512m" \
+    PATH="/opt/jre/bin:${PATH}"
+EXPOSE 8083
 
-ENV JAVA_OPTS="-Xms256m -Xmx512m"
-USER appuser
-
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
-  CMD wget -qO- http://127.0.0.1:8080/health || exit 1
-
-ENTRYPOINT [ "sh", "-lc", "exec java $JAVA_OPTS -jar /app/shipping.jar" ]
+# ENTRYPOINT runs java; CMD supplies default args to run the app
+ENTRYPOINT ["java"]
+CMD ["-jar","/app/app.jar"]
