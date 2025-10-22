@@ -9,7 +9,7 @@ RUN mvn -q -DskipTests clean package \
 
 # --- Runtime stage ---
 # Tip: use a JRE-only base to shrink size (alpine also available if you prefer)
-FROM amazoncorretto:17-alpine-jre
+FROM amazoncorretto:17
 WORKDIR /app
 
 # Create non-root user & make sure /app is writable by it
