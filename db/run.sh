@@ -3,24 +3,24 @@ set -euo pipefail
 
 : "${DB_HOST:?DB_HOST is required}"
 : "${DB_PORT:?DB_PORT is required}"
-: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
+: "${DB_PASS:?DB_PASS is required}"
 TASK="${TASK:-all}"
 
 run_schema() {
   : "${DB_NAME:?DB_NAME is required for schema}"
   echo ">> Applying schema.sql"
-  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" < /work/sql/schema.sql
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$DB_PASS" "$DB_NAME" < /work/sql/schema.sql
 }
 
 run_app_user() {
   echo ">> Applying app-user.sql"
-  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$MYSQL_ROOT_PASSWORD" < /work/sql/app-user.sql
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$DB_PASS" < /work/sql/app-user.sql
 }
 
 run_master_data() {
   : "${DB_NAME:?DB_NAME is required for master-data}"
   echo ">> Applying master-data.sql"
-  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$MYSQL_ROOT_PASSWORD" "$DB_NAME" < /work/sql/master-data.sql
+  mysql -h "$DB_HOST" -P "$DB_PORT" -u root -p"$DB_PASS" "$DB_NAME" < /work/sql/master-data.sql
 }
 
 case "$TASK" in
